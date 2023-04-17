@@ -31,7 +31,12 @@ class MediaContentFormatModel(DeclBase, BaseMixin, TimestampMixin):
         return relationship('MediaContentModel', back_populates="formats", lazy="selectin")
 
     def export(self):
-        raise NotImplementedError
+        rv = {'format_class': self.format_class_name}
+        if self.width or self.height:
+            rv['width'] = self.width
+            rv['height'] = self.height
+            rv['info'] = self.info
+        return rv
 
     __mapper_args__ = {
         "polymorphic_identity": format_class_name,
@@ -45,7 +50,8 @@ class ExternalPublishedMediaContentFormatModel(MediaContentFormatModel):
     uri = Column(String, nullable=False)
 
     def export(self):
-        raise NotImplementedError
+        rv = super(ExternalPublishedMediaContentFormatModel, self).export()
+        rv['uri'] = self.uri
 
     __mapper_args__ = {
         "polymorphic_identity": format_class_name,
@@ -57,12 +63,13 @@ class FileMediaContentFormatModel(MediaContentFormatModel):
     id = Column(Integer, ForeignKey("MediaContentFormat.id"), primary_key=True)
     stored_file_id: Mapped[int] = mapped_column(ForeignKey("StoredFile.id"), nullable=False)
 
-    def export(self):
-        raise NotImplementedError
-
     @declared_attr
     def stored_file(cls):
         return relationship(StoredFileModel, lazy="selectin")
+
+    def export(self):
+        rv = super(FileMediaContentFormatModel, self).export()
+        rv['uri'] = self.stored_file.expose_uri
 
     __mapper_args__ = {
         "polymorphic_identity": format_class_name,

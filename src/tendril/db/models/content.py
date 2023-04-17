@@ -21,7 +21,7 @@ from .content_formats import MediaContentFormatModel
 
 class ContentModel(DeclBase, BaseMixin, TimestampMixin):
     type_name = 'generic'
-    content_type = Column(String(32), nullable=False)
+    content_type = Column(String(32), nullable=False, default=type_name)
 
     bg_color = Column(String(20))
 
@@ -41,7 +41,10 @@ class ContentModel(DeclBase, BaseMixin, TimestampMixin):
     }
 
     def export(self):
-        raise NotImplementedError
+        rv = {'content_type': self.content_type}
+        if self.bg_color:
+            rv['bg_color'] = self.bg_color
+        return rv
 
 
 class MediaContentModel(ContentModel):
@@ -57,7 +60,9 @@ class MediaContentModel(ContentModel):
     }
 
     def export(self):
-        raise NotImplementedError
+        rv = super(MediaContentModel, self).export()
+        rv['formats'] = [x.export() for x in self.formats]
+        return rv
 
 
 class StructuredContentModel(ContentModel):
@@ -72,7 +77,11 @@ class StructuredContentModel(ContentModel):
     }
 
     def export(self):
-        raise NotImplementedError
+        rv = super(StructuredContentModel, self).export()
+        rv['path'] = [self.path]
+        if self.args:
+            rv['args'] = self.args
+        return rv
 
 
 class SequenceContentModel(ContentModel):
@@ -89,7 +98,10 @@ class SequenceContentModel(ContentModel):
     }
 
     def export(self):
-        raise NotImplementedError
+        rv = super(SequenceContentModel, self).export()
+        rv['default_duration'] = self.default_duration
+        rv['contents'] = [x.export() for x in self.contents]
+        return rv
 
 
 class SequenceContentAssociationModel(DeclBase):
