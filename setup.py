@@ -33,6 +33,7 @@ core_dependencies = [
     'tendril-filestore',
     'pymediainfo',
     'pypdf',
+    'pillow'
 ]
 
 install_requires = core_dependencies + ['wheel']

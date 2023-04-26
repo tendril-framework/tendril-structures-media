@@ -57,7 +57,9 @@ class DocumentFileInfoParser(MediaFileInfoParser):
         except:
             raise
             file.seek(0, os.SEEK_END)
-            return file.tell()
+            rv = file.tell()
+            file.seek(0)
+            return rv
 
     def _parse(self, file):
         rv = super(DocumentFileInfoParser, self)._parse(file)

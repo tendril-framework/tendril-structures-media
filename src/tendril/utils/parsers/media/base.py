@@ -7,6 +7,8 @@ from pydantic.dataclasses import dataclass
 from dataclasses import asdict
 from pydantic.json import pydantic_encoder
 
+from PIL import Image
+
 
 @dataclass
 class MediaFileGeneralInfo(object):
@@ -59,3 +61,17 @@ class MediaFileInfoParser(object):
 
     def parse(self, file):
         return self.info_class(**self._parse(file))
+
+
+class MediaThumbnailGenerator(object):
+    def pack_and_write(self, size, output_path, image, background):
+        canvas = Image.new('RGBA', size, background)
+        canvas.paste(image,
+                     (int((size[0] - image.size[0]) / 2),
+                      int((size[1] - image.size[1]) / 2)))
+        canvas.save(output_path)
+        return output_path
+
+    def generate_thumbnail(self, file, output_path, size, background,
+                           output_format='png'):
+        raise NotImplementedError

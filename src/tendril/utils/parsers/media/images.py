@@ -1,6 +1,7 @@
 
 
 import warnings
+from PIL import Image
 from typing import List
 from pydantic.dataclasses import dataclass
 from pymediainfo import MediaInfo
@@ -10,6 +11,7 @@ from .av import ImageTrackInfo
 from .base import MediaFileGeneralInfo
 from .base import MediaFileInfo
 from .base import MediaFileInfoParser
+from .base import MediaThumbnailGenerator
 
 
 @dataclass
@@ -80,3 +82,11 @@ class ImageFileInfoParser(MediaFileInfoParser):
         rv['general'] = self._parse_general_information(mi, fname=file.name)
         rv['image'] = self._parse_image_information(mi, fname=file.name)
         return rv
+
+
+class ImageThumbnailGenerator(MediaThumbnailGenerator):
+    def generate_thumbnail(self, file, output_path, size,
+                           background, output_format='png'):
+        image = Image.open(file)
+        image.thumbnail(size)
+        return self.pack_and_write(size, output_path, image, background)
