@@ -54,6 +54,20 @@ config_elements_media = [
         'MEDIA_EXTENSIONS',
         "MEDIA_VIDEO_EXTENSIONS + MEDIA_IMAGE_EXTENSIONS + MEDIA_DOCUMENT_EXTENSIONS + MEDIA_EXTRA_EXTENSIONS",
         "List of recognized extensions for media files"
+    ),
+    ConfigOption(
+        'MEDIA_THUMBNAIL_SIZES',
+        "[400]",
+        "List of thumbnail sizes to generate for media content. If integers are provided, "
+        "thumbnails will be square with MEDIA_THUMBNAIL_BACKGROUND in the remaining area. "
+        "If a different shape is desired, provide tuples of two elements. Integers and "
+        "tuples can be mixed."
+    ),
+    ConfigOption(
+        'MEDIA_THUMBNAIL_BACKGROUND',
+        "(255,255,255,0)",
+        "Background color to use for thumbnails. The default leaves a completely empty "
+        "alpha channel"
     )
 ]
 
