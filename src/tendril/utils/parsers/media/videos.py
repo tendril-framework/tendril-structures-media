@@ -141,4 +141,5 @@ class VideoThumbnailGenerator(MediaThumbnailGenerator):
             raise Exception("Something strange happened. No viable thumb frame found!")
 
         image.thumbnail(size)
+        file.seek(0)
         return self.pack_and_write(size, output_path, image, background)

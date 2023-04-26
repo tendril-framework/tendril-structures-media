@@ -65,11 +65,18 @@ class MediaFileInfoParser(object):
 
 class MediaThumbnailGenerator(object):
     def pack_and_write(self, size, output_path, image, background):
-        canvas = Image.new('RGBA', size, background)
-        canvas.paste(image,
-                     (int((size[0] - image.size[0]) / 2),
-                      int((size[1] - image.size[1]) / 2)))
-        canvas.save(output_path)
+        if background:
+            if len(background) == 4 and background[3] < 255:
+                canvas_format = 'RGBA'
+            else:
+                canvas_format = 'RGB'
+            canvas = Image.new(canvas_format, size, background)
+            canvas.paste(image,
+                         (int((size[0] - image.size[0]) / 2),
+                          int((size[1] - image.size[1]) / 2)))
+            canvas.save(output_path, optimize=True, progressive=True, quality=75)
+        else:
+            image.convert('RGB').save(output_path, optimize=True, progressive=True, quality=75)
         return output_path
 
     def generate_thumbnail(self, file, output_path, size, background,

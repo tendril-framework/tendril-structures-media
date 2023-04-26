@@ -57,7 +57,7 @@ config_elements_media = [
     ),
     ConfigOption(
         'MEDIA_THUMBNAIL_SIZES',
-        "[400]",
+        "[128,256,512]",
         "List of thumbnail sizes to generate for media content. If integers are provided, "
         "thumbnails will be square with MEDIA_THUMBNAIL_BACKGROUND in the remaining area. "
         "If a different shape is desired, provide tuples of two elements. Integers and "
@@ -65,9 +65,15 @@ config_elements_media = [
     ),
     ConfigOption(
         'MEDIA_THUMBNAIL_BACKGROUND',
-        "(255,255,255,0)",
-        "Background color to use for thumbnails. The default leaves a completely empty "
-        "alpha channel"
+        "None",
+        "If the thumbnail is to be paaded, then the background color to use for thumbnails. "
+        "Leave as None to disable thumbnail padding. In principle, padding is "
+        "relatively inexpensive and can provide well-sized images. However, if the "
+        "background color uses an alpha channel, thumbnails will be generated in PNG and "
+        "will be about 10 times larger, so use only if bandwidth is not a concern at all "
+        "and latency is very low - essentially only for LAN deployments."
+        "(255,255,255) creates a letterbox effect with a white background. Provide RGBA "
+        "colors such as (255,255,255, 0) instead if transparency is needed. "
     )
 ]
 

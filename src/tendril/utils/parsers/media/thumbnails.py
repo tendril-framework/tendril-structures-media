@@ -15,7 +15,6 @@ from .videos import VideoThumbnailGenerator
 from .documents import DocumentThumbnailGenerator
 
 
-
 def _build_generators():
     rv = {}
     for generator, exts in [
@@ -31,14 +30,19 @@ def _build_generators():
 _generators = _build_generators()
 
 
-def generate_thumbnail(file, output_dir, size: Union[int, Tuple[int]] = 400, output_fname=None,
-                       background=MEDIA_THUMBNAIL_BACKGROUND, output_format='png'):
+def generate_thumbnail(file, output_dir, size: Union[int, Tuple[int]] = 256, output_fname=None,
+                       background=MEDIA_THUMBNAIL_BACKGROUND):
     _to_close = False
     if isinstance(file, str):
         file = open(file, 'rb')
         _to_close = True
 
     fname, fext = os.path.splitext(os.path.split(file.name)[1])
+
+    if background and len(background) == 4 and background[3] < 255:
+        output_format = 'png'
+    else:
+        output_format = 'jpg'
 
     if not output_fname:
         if isinstance(size, int):
@@ -62,8 +66,7 @@ def generate_thumbnail(file, output_dir, size: Union[int, Tuple[int]] = 400, out
         size = (size, size)
 
     outpath = generator.generate_thumbnail(file, output_path, size=size,
-                                           background=background,
-                                           output_format=output_format)
+                                           background=background)
 
     if _to_close:
         file.close()
