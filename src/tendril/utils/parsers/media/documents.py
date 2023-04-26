@@ -4,9 +4,11 @@ import os
 from typing import Optional
 from pypdf import PdfReader
 from pydantic.dataclasses import dataclass
+from pdf2image import convert_from_bytes
 from .base import MediaFileInfo
 from .base import MediaFileInfoParser
 from .base import MediaFileGeneralInfo
+from .base import MediaThumbnailGenerator
 
 
 @dataclass
@@ -74,3 +76,12 @@ class DocumentFileInfoParser(MediaFileInfoParser):
         rv['document'] = self._parse_document_information(reader)
         return rv
 
+
+class DocumentThumbnailGenerator(MediaThumbnailGenerator):
+    def generate_thumbnail(self, file, output_path, size,
+                           background, output_format='png'):
+        images = convert_from_bytes(file.read(), first_page=1, last_page=1)
+        file.seek(0)
+        image = images[0]
+        image.thumbnail(size)
+        return self.pack_and_write(size, output_path, image, background)

@@ -12,6 +12,8 @@ from tendril.config import MEDIA_THUMBNAIL_BACKGROUND
 
 from .images import ImageThumbnailGenerator
 from .videos import VideoThumbnailGenerator
+from .documents import DocumentThumbnailGenerator
+
 
 
 def _build_generators():
@@ -19,7 +21,7 @@ def _build_generators():
     for generator, exts in [
         (VideoThumbnailGenerator(), MEDIA_VIDEO_EXTENSIONS),
         (ImageThumbnailGenerator(), MEDIA_IMAGE_EXTENSIONS),
-        # (DocumentThumbnailGenerator(), MEDIA_DOCUMENT_EXTENSIONS),
+        (DocumentThumbnailGenerator(), MEDIA_DOCUMENT_EXTENSIONS),
     ]:
         for ext in exts:
             rv[ext] = generator
@@ -40,9 +42,9 @@ def generate_thumbnail(file, output_dir, size: Union[int, Tuple[int]] = 400, out
 
     if not output_fname:
         if isinstance(size, int):
-            output_fname = f'{fname}.thumb_{size}.{output_format}'
+            output_fname = f'{fname}{fext}.thumb_{size}.{output_format}'
         else:
-            output_fname = f'{fname}.thumb_{size[0]}x{size[1]}.{output_format}'
+            output_fname = f'{fname}{fext}.thumb_{size[0]}x{size[1]}.{output_format}'
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)

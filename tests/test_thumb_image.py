@@ -9,7 +9,7 @@ for ext in MEDIA_IMAGE_EXTENSIONS:
     fp = 'media/test' + ext
     print("### : ", ext)
     with open(fp, 'rb') as f:
-        output_file = generate_thumbnail(f, output_fname=f'test{ext}.thumb_400.png', output_dir='thumbs')
+        output_file = generate_thumbnail(f, output_dir='thumbs')
     print(f"Thumbnail Generated : {output_file}")
     print('----------------------------------')
 

@@ -35,6 +35,7 @@ core_dependencies = [
     'pypdf',
     'pillow',
     'av',
+    'pdf2image',
 ]
 
 install_requires = core_dependencies + ['wheel']
