@@ -4,6 +4,7 @@ import warnings
 from typing import List
 from typing import Optional
 
+import av
 from pymediainfo import MediaInfo
 from pymediainfo import Track
 
@@ -11,6 +12,7 @@ from pydantic.dataclasses import dataclass
 
 from .base import MediaFileInfo
 from .base import MediaFileInfoParser
+from .base import MediaThumbnailGenerator
 
 from .av import AVFileGeneralInfo
 from .av import VideoTrackInfo
@@ -118,3 +120,25 @@ class VideoFileInfoParser(MediaFileInfoParser):
         rv['video'] = self._parse_video_information(mi, fname=file.name)
         rv['audio'] = self._parse_audio_information(mi, fname=file.name)
         return rv
+
+
+class VideoThumbnailGenerator(MediaThumbnailGenerator):
+    def generate_thumbnail(self, file, output_path, size,
+                           background, output_format='png'):
+        container = av.open(file)
+        duration = container.duration * 1e-6
+        thumb_frame_time = duration * 0.1
+        stream = container.streams.video[0]
+        stream.codec_context.skip_frame = "NONKEY"
+
+        image = None
+        for frame in container.decode(stream):
+            if frame.time > thumb_frame_time:
+                image = frame.to_image()
+                break
+
+        if not image:
+            raise Exception("Something strange happened. No viable thumb frame found!")
+
+        image.thumbnail(size)
+        return self.pack_and_write(size, output_path, image, background)

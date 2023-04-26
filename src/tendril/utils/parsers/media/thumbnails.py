@@ -11,12 +11,13 @@ from tendril.config import MEDIA_THUMBNAIL_SIZES
 from tendril.config import MEDIA_THUMBNAIL_BACKGROUND
 
 from .images import ImageThumbnailGenerator
+from .videos import VideoThumbnailGenerator
 
 
 def _build_generators():
     rv = {}
     for generator, exts in [
-        # (VideoThumbnailGenerator(), MEDIA_VIDEO_EXTENSIONS),
+        (VideoThumbnailGenerator(), MEDIA_VIDEO_EXTENSIONS),
         (ImageThumbnailGenerator(), MEDIA_IMAGE_EXTENSIONS),
         # (DocumentThumbnailGenerator(), MEDIA_DOCUMENT_EXTENSIONS),
     ]:
