@@ -1,0 +1,150 @@
+
+
+import os
+from typing import Dict
+from typing import Union
+from pydantic.fields import Field
+
+from fastapi import APIRouter
+from fastapi import Request
+from fastapi import Depends
+from fastapi import File
+from fastapi import UploadFile
+from fastapi import BackgroundTasks
+
+from tendril.authn.users import auth_spec
+from tendril.authn.users import AuthUserModel
+from tendril.authn.users import authn_dependency
+
+from tendril.apiserver.templates.base import ApiRouterGenerator
+from tendril.utils.pydantic import TendrilTORMModel
+from tendril.utils.db import get_session
+
+from tendril.caching import tokens
+from tendril.caching.tokens import GenericTokenTModel
+
+from tendril.structures.media import content_models
+from tendril.config import MEDIA_EXTENSIONS
+from tendril.interests.mixins.content import MediaContentInterest
+from tendril.common.content.exceptions import ContentTypeMismatchError
+from tendril.common.content.exceptions import FileTypeUnsupported
+from tendril.db.models.content_formats import MediaContentFormatInfoTModel
+from tendril.db.models.content_formats import MediaContentFormatInfoFullTModel
+from tendril.db.models.content import MediaContentInfoTModel
+from tendril.db.models.content import MediaContentInfoFullTModel
+
+
+class ContentTypeDetailTModel(TendrilTORMModel):
+    type_description: str = Field(..., alias='display_name')
+
+
+class InterestContentRouterGenerator(ApiRouterGenerator):
+    def __init__(self, actual):
+        super(InterestContentRouterGenerator, self).__init__()
+        self._actual = actual
+
+    async def accepted_types(self, request: Request,
+                             user: AuthUserModel = auth_spec()):
+        return self._actual.accepted_types
+
+    async def content_info(self, request: Request,
+                           id: int, full: bool = False,
+                           user: AuthUserModel = auth_spec()):
+        with get_session() as session:
+            interest: MediaContentInterest = self._actual.item(id=id, session=session)
+            return interest.content_information(full=full, auth_user=user, session=session)
+
+    async def upload_media_format(self, request: Request,
+                                  id: int, background_tasks: BackgroundTasks,
+                                  file: UploadFile = File(...),
+                                  user: AuthUserModel = auth_spec()):
+        """
+        Warning : This can only be done when the interest is in the NEW state. This
+                  enforces approval requirements on any change in the formats. An additional
+                  API endpoint (something like reset approvals?) is needed for this.
+        """
+        with get_session() as session:
+            interest: MediaContentInterest = self._actual.item(id=id, session=session)
+
+            # Make sure it's the correct content type before doing anything.
+            if not content_models[interest.content_type].allows_actual_media:
+                raise ContentTypeMismatchError(interest.content_type, 'media',
+                                               'add_artefact', interest.id, interest.name,)
+
+            # Ensure we accept the file extension
+            file_ext = os.path.splitext(file.filename)[1]
+            if file_ext not in MEDIA_EXTENSIONS:
+                raise FileTypeUnsupported(file_ext, MEDIA_EXTENSIONS,
+                                          'add_artefact', interest.id, interest.name,)
+
+            # Get Auth clearance before sending the task to the background. This will
+            # raise an exception if there is a problem.
+            interest.add_format(probe_only=True, auth_user=user, session=session)
+
+            # The above prechecks are required at the API level here since we are delegating
+            # to a background task, and we want to avoid forcing the client to deal with
+            # exceptions in that context.
+            fidx = interest.fidx_burn(auth_user=user, session=session)
+            storage_filename = f"{interest.name}_f{fidx}{file_ext}"
+
+            # Generate Upload Ticket and return
+            upload_token = tokens.open(
+                namespace='mfu',
+                metadata={'interest_id': interest.id,
+                          'filename': storage_filename},
+                user=user.id, current="Request Created",
+                progress_max=1, ttl=600,
+            )
+
+            background_tasks.add_task(interest.add_format, file=file,
+                                      rename_to=storage_filename,
+                                      token_id=upload_token.id,
+                                      auth_user=user, session=session)
+
+        return upload_token
+
+    async def format_info(self, request: Request, id: int, format_id: int,
+                          full: bool = True,
+                          user: AuthUserModel = auth_spec()):
+        with get_session() as session:
+            interest: MediaContentInterest = self._actual.item(id=id, session=session)
+            return interest.format_information(format_id, full=full, auth_user=user, session=session)
+
+    async def delete_media_format(self, request: Request,
+                                  id: int, filename: str,
+                                  user:AuthUserModel = auth_spec()):
+        """
+        Warning : This can only be done when the interest is in the NEW state. This
+                  enforces approval requirements on any change in the formats. An additional
+                  API endpoint (something like reset approvals?) is needed for this.
+        """
+        pass
+
+    def generate(self, name):
+        desc = f'Content API for {name} Interests'
+        prefix = self._actual.interest_class.model.role_spec.prefix
+        router = APIRouter(prefix=f'/{name}', tags=[desc],
+                           dependencies=[Depends(authn_dependency)])
+
+        router.add_api_route("/allowed_types", self.accepted_types, methods=["GET"],
+                             response_model=Dict[str, ContentTypeDetailTModel],
+                             response_model_exclude_none=True,
+                             dependencies=[auth_spec(scopes=[f'{prefix}:read'])], )
+
+        router.add_api_route("/{id}/content_info", self.content_info, methods=["GET"],
+                             response_model=Union[MediaContentInfoFullTModel, MediaContentInfoTModel],
+                             dependencies=[auth_spec(scopes=[f'{prefix}:read'])])
+
+        router.add_api_route("/{id}/formats/info/{format_id}", self.format_info, methods=["GET"],
+                             response_model=Union[MediaContentFormatInfoFullTModel, MediaContentFormatInfoTModel],
+                             dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
+
+        router.add_api_route("/{id}/formats/upload", self.upload_media_format, methods=["POST"],
+                             response_model=GenericTokenTModel,
+                             dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
+
+        # router.add_api_route("/{id}/formats/delete", self.delete_media_format, methods=["POST"],
+        #                      # response_model=[],
+        #                      dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
+
+        return [router]

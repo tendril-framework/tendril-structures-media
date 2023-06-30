@@ -30,14 +30,17 @@ def _build_generators():
 _generators = _build_generators()
 
 
-def generate_thumbnail(file, output_dir, size: Union[int, Tuple[int]] = 256, output_fname=None,
+def generate_thumbnail(file, output_dir, filename=None,
+                       size: Union[int, Tuple[int]] = 256,
+                       output_fname=None,
                        background=MEDIA_THUMBNAIL_BACKGROUND):
     _to_close = False
     if isinstance(file, str):
         file = open(file, 'rb')
         _to_close = True
+        filename = file.name
 
-    fname, fext = os.path.splitext(os.path.split(file.name)[1])
+    fname, fext = os.path.splitext(os.path.split(filename)[1])
 
     if background and len(background) == 4 and background[3] < 255:
         output_format = 'png'
@@ -46,9 +49,9 @@ def generate_thumbnail(file, output_dir, size: Union[int, Tuple[int]] = 256, out
 
     if not output_fname:
         if isinstance(size, int):
-            output_fname = f'{fname}{fext}.thumb_{size}.{output_format}'
+            output_fname = f'{fname}{fext.replace(".", "_")}_thumb_{size}.{output_format}'
         else:
-            output_fname = f'{fname}{fext}.thumb_{size[0]}x{size[1]}.{output_format}'
+            output_fname = f'{fname}{fext.replace(".", "_")}_thumb_{size[0]}x{size[1]}.{output_format}'
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
@@ -71,12 +74,12 @@ def generate_thumbnail(file, output_dir, size: Union[int, Tuple[int]] = 256, out
     if _to_close:
         file.close()
 
-    return outpath
+    return size, outpath
 
 
-def generate_thumbnails(file, output_dir, background=MEDIA_THUMBNAIL_BACKGROUND):
+def generate_thumbnails(file, output_dir, filename=None, background=MEDIA_THUMBNAIL_BACKGROUND):
     rv = []
     for size in MEDIA_THUMBNAIL_SIZES:
-        rv.append(generate_thumbnail(file, output_dir,
+        rv.append(generate_thumbnail(file, output_dir, filename=filename,
                                      size=size, background=background))
     return rv

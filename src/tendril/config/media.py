@@ -74,6 +74,19 @@ config_elements_media = [
         "and latency is very low - essentially only for LAN deployments."
         "(255,255,255) creates a letterbox effect with a white background. Provide RGBA "
         "colors such as (255,255,255, 0) instead if transparency is needed. "
+    ),
+    ConfigOption(
+        'MEDIA_UPLOAD_FILESTORE_BUCKET',
+        '"incoming"',
+        "The filestore bucket in which to write uploaded media files. Note that filestore "
+        "will not have this bucket by default. You must create it or choose one that exists."
+    ),
+    ConfigOption(
+        'MEDIA_PUBLISHING_FILESTORE_BUCKET',
+        '"cdn"',
+        "The filestore bucket in which published media files are to be written Note that "
+        "filestore will not have this bucket by default. You must create it or choose one "
+        "that exists."
     )
 ]
 

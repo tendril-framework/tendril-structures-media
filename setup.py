@@ -31,11 +31,13 @@ def read(fname):
 core_dependencies = [
     'tendril-utils-db',
     'tendril-filestore',
+    'tendril-caching',
     'pymediainfo',
     'pypdf',
     'pillow',
     'av',
     'pdf2image',
+    'asgiref',
 ]
 
 install_requires = core_dependencies + ['wheel']

@@ -2,6 +2,7 @@
 
 import os
 from typing import Optional
+from typing import Literal
 from pypdf import PdfReader
 from pydantic.dataclasses import dataclass
 from pdf2image import convert_from_bytes
@@ -37,6 +38,9 @@ class PdfFileInfo(MediaFileInfo):
     def height(self):
         return None
 
+    def duration(self):
+        return -1 * self.document.pages
+
 
 class DocumentFileInfoParser(MediaFileInfoParser):
     info_class = PdfFileInfo
@@ -57,14 +61,13 @@ class DocumentFileInfoParser(MediaFileInfoParser):
         try:
             return os.fstat(file.fileno()).st_size
         except:
-            raise
             file.seek(0, os.SEEK_END)
             rv = file.tell()
             file.seek(0)
             return rv
 
-    def _parse(self, file):
-        rv = super(DocumentFileInfoParser, self)._parse(file)
+    def _parse(self, file, *args, **kwargs):
+        rv = super(DocumentFileInfoParser, self)._parse(file, *args, **kwargs)
         rv['general'] = {
             'container': "PDF",
             'file_size': self._get_size(file),
@@ -80,6 +83,7 @@ class DocumentFileInfoParser(MediaFileInfoParser):
 class DocumentThumbnailGenerator(MediaThumbnailGenerator):
     def generate_thumbnail(self, file, output_path, size,
                            background, output_format='png'):
+        file.seek(0)
         images = convert_from_bytes(file.read(), first_page=1, last_page=1)
         file.seek(0)
         image = images[0]

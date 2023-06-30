@@ -34,6 +34,7 @@ def _strip_nones(nested_dict: dict):
 
 @dataclass
 class MediaFileInfo(object):
+    filename: str
     original_filename: str
     ext: str
 
@@ -50,17 +51,31 @@ class MediaFileInfo(object):
     def height(self):
         raise NotImplementedError
 
+    def duration(self):
+        raise NotImplementedError
+
 
 class MediaFileInfoParser(object):
     info_class = MediaFileInfo
 
-    def _parse(self, file):
-        rv = {'original_filename': os.path.split(file.name)[1],
-              'ext': os.path.splitext(file.name)[1]}
+    def _get_filename(self, file):
+        if isinstance(file, str):
+            return file
+        elif hasattr(file, 'name'):
+            return file.name
+        elif hasattr(file, 'filename'):
+            return file.filename
+
+    def _parse(self, file, filename=None, original_filename=None):
+        if not filename:
+            filename = self._get_filename(file)
+        rv = {'filename': os.path.split(filename)[-1],
+              'original_filename': original_filename,
+              'ext': os.path.splitext(filename)[1]}
         return rv
 
-    def parse(self, file):
-        return self.info_class(**self._parse(file))
+    def parse(self, file, *args, **kwargs):
+        return self.info_class(**self._parse(file, *args, **kwargs))
 
 
 class MediaThumbnailGenerator(object):

@@ -1,8 +1,10 @@
 
 
 import warnings
+from math import ceil
 from typing import List
 from typing import Optional
+from typing import Literal
 
 import av
 from pymediainfo import MediaInfo
@@ -35,6 +37,9 @@ class VideoFileInfo(MediaFileInfo):
 
     def height(self):
         return self.video[0].height
+
+    def duration(self):
+        return ceil(self.general.duration / 1000.0)
 
 
 class VideoFileInfoParser(MediaFileInfoParser):
@@ -113,19 +118,21 @@ class VideoFileInfoParser(MediaFileInfoParser):
         rv = [self._parse_audio_track_information(audio_track)]
         return rv
 
-    def _parse(self, file):
-        rv = super(VideoFileInfoParser, self)._parse(file)
+    def _parse(self, file, *args, **kwargs):
+        ofname = kwargs.get('filename') or kwargs.get('original_filename')
+        rv = super(VideoFileInfoParser, self)._parse(file, *args, **kwargs)
         mi = MediaInfo.parse(file, parse_speed=1.0)
-        rv['general'] = self._parse_general_information(mi, fname=file.name)
-        rv['video'] = self._parse_video_information(mi, fname=file.name)
-        rv['audio'] = self._parse_audio_information(mi, fname=file.name)
+        rv['general'] = self._parse_general_information(mi, fname=ofname)
+        rv['video'] = self._parse_video_information(mi, fname=ofname)
+        rv['audio'] = self._parse_audio_information(mi, fname=ofname)
         return rv
 
 
 class VideoThumbnailGenerator(MediaThumbnailGenerator):
     def generate_thumbnail(self, file, output_path, size,
                            background, output_format='png'):
-        container = av.open(file)
+        file.seek(0)
+        container = av.open(file, 'r')
         duration = container.duration * 1e-6
         thumb_frame_time = duration * 0.1
         stream = container.streams.video[0]

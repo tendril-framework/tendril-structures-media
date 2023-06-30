@@ -3,6 +3,7 @@
 import warnings
 from PIL import Image
 from typing import List
+from typing import Literal
 from pydantic.dataclasses import dataclass
 from pymediainfo import MediaInfo
 from pymediainfo import Track
@@ -28,6 +29,9 @@ class ImageFileInfo(MediaFileInfo):
 
     def height(self):
         return self.image[0].height
+
+    def duration(self):
+        return -1
 
 
 class ImageFileInfoParser(MediaFileInfoParser):
@@ -76,11 +80,12 @@ class ImageFileInfoParser(MediaFileInfoParser):
         rv = [self._parse_image_track_information(image_track)]
         return rv
 
-    def _parse(self, file):
-        rv = super(ImageFileInfoParser, self)._parse(file)
+    def _parse(self, file, *args, **kwargs):
+        ofname = kwargs.get('original_filename') or kwargs.get('filename')
+        rv = super(ImageFileInfoParser, self)._parse(file, *args, **kwargs)
         mi = MediaInfo.parse(file)
-        rv['general'] = self._parse_general_information(mi, fname=file.name)
-        rv['image'] = self._parse_image_information(mi, fname=file.name)
+        rv['general'] = self._parse_general_information(mi, fname=ofname)
+        rv['image'] = self._parse_image_information(mi, fname=ofname)
         return rv
 
 
