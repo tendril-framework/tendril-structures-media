@@ -1,6 +1,5 @@
 
 
-from pprint import pprint
 import os
 from asgiref.sync import async_to_sync
 
@@ -132,7 +131,7 @@ class MediaContentInterest(InterestBase):
         try:
             upload_response = async_to_sync(self.upload_bucket.upload)(
                 file=(os.path.join(storage_folder, filename), file.file),
-                actual_user=auth_user.id
+                actual_user=auth_user.id, interest=self.id
             )
         except HTTPStatusError as e:
             self._report_filestore_error(token_id, e, "uploading media file to bucket")
@@ -161,7 +160,7 @@ class MediaContentInterest(InterestBase):
                 try:
                     response = async_to_sync(self.upload_bucket.upload)(
                         file=(os.path.join(storage_folder, fname), thumb_file),
-                        actual_user=auth_user.id
+                        actual_user=auth_user.id, interest=self.id
                     )
                 except HTTPStatusError as e:
                     self._report_filestore_error(token_id, e, "uploading thumbnail to bucket")
@@ -191,12 +190,11 @@ class MediaContentInterest(InterestBase):
         # 6. Create Thumbnail DB Entries
 
         for tsize, fname, response in published_thumbnails:
-            thumbnail_instance = create_content_format_thumbnail(
+            create_content_format_thumbnail(
                 id=format_model_instance.id,
                 stored_file_id=response['storedfileid'],
                 width=tsize[0], height=tsize[1],
             )
-            print(thumbnail_instance)
 
         if token_id:
             tokens.update(self.token_namespace, token_id, current="Finishing", done=6)

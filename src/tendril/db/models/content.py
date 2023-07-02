@@ -32,8 +32,8 @@ class MediaContentInfoTModel(TendrilTBaseModel):
     content_type: str
     bg_color: Optional[Any]
     formats: List[Union[MediaContentFormatInfoFullTModel,
-                        MediaContentFormatInfoTModel]]
-    thumbnails: ThumbnailListingTModel
+                        MediaContentFormatInfoTModel]] = []
+    thumbnails: Optional[ThumbnailListingTModel]
 
 
 class MediaContentInfoFullTModel(MediaContentInfoTModel):
