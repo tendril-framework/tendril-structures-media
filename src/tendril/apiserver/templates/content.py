@@ -9,6 +9,7 @@ from fastapi import APIRouter
 from fastapi import Request
 from fastapi import Depends
 from fastapi import File
+from fastapi import Body
 from fastapi import UploadFile
 from fastapi import BackgroundTasks
 
@@ -23,7 +24,7 @@ from tendril.utils.db import get_session
 from tendril.caching import tokens
 from tendril.caching.tokens import GenericTokenTModel
 
-from tendril.structures.media import content_models
+from tendril.structures.content import content_models
 from tendril.config import MEDIA_EXTENSIONS
 from tendril.interests.mixins.content import MediaContentInterest
 from tendril.common.content.exceptions import ContentTypeMismatchError
@@ -81,11 +82,16 @@ class InterestContentRouterGenerator(ApiRouterGenerator):
             # raise an exception if there is a problem.
             interest.add_format(probe_only=True, auth_user=user, session=session)
 
+            # Burn an fidx and lock in the filename for the uploaded file.
+            fidx = interest.fidx_burn(auth_user=user, session=session)
+            storage_filename = f"{interest.name}_f{fidx}{file_ext}"
+
             # The above prechecks are required at the API level here since we are delegating
             # to a background task, and we want to avoid forcing the client to deal with
             # exceptions in that context.
-            fidx = interest.fidx_burn(auth_user=user, session=session)
-            storage_filename = f"{interest.name}_f{fidx}{file_ext}"
+
+            # TODO Consider providing a helper function in the interest iteself to do
+            #  this stuff instead. The interest otherwise remains bare and unprotected.
 
             # Generate Upload Ticket and return
             upload_token = tokens.open(
@@ -112,13 +118,20 @@ class InterestContentRouterGenerator(ApiRouterGenerator):
 
     async def delete_media_format(self, request: Request,
                                   id: int, filename: str,
-                                  user:AuthUserModel = auth_spec()):
+                                  user: AuthUserModel = auth_spec()):
         """
         Warning : This can only be done when the interest is in the NEW state. This
                   enforces approval requirements on any change in the formats. An additional
                   API endpoint (something like reset approvals?) is needed for this.
         """
         pass
+
+    async def generate_provider_content(self, request:Request, id:int,
+                                        provider_id:int, args: dict=Body(...),
+                                        user: AuthUserModel = auth_spec()):
+        with get_session() as session:
+            interest: MediaContentInterest = self._actual.item(id=id, session=session)
+            return interest.generate_from_provider(provider_id, args=args, auth_user=user, session=session)
 
     def generate(self, name):
         desc = f'Content API for {name} Interests'
@@ -146,5 +159,9 @@ class InterestContentRouterGenerator(ApiRouterGenerator):
         # router.add_api_route("/{id}/formats/delete", self.delete_media_format, methods=["POST"],
         #                      # response_model=[],
         #                      dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
+
+        router.add_api_route("/{id}/provider/{provider_id}/generate", self.generate_provider_content, methods=['POST'],
+                             # response_model=,
+                             dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
 
         return [router]

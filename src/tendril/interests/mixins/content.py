@@ -5,6 +5,9 @@ from asgiref.sync import async_to_sync
 
 from httpx import HTTPStatusError
 
+from tendril.db.controllers.interests import get_interest
+from tendril.common.content.exceptions import ContentTypeMismatchError
+
 from tendril.filestore import buckets
 from tendril.config import MEDIA_UPLOAD_FILESTORE_BUCKET
 from tendril.config import MEDIA_PUBLISHING_FILESTORE_BUCKET
@@ -35,6 +38,20 @@ logger = log.get_logger(__name__, log.DEFAULT)
 
 
 class MediaContentInterest(InterestBase):
+    # WARNING.
+    #
+    # This is a common container for the different content types.
+    # This is terrible, and needs to be fixed. The main issue is
+    # the current implicit assumption of a 1-1 mapping between an
+    # interest class and the model.
+    #
+    # Devices should have the same problem, but more effort has
+    # gone into working around it there, I think.
+    #
+    # The resolution will probably be to extend the same kind of
+    # class composition that was done at the interest level to the
+    # interest class as well.
+
     token_namespace = 'mfu'
     upload_bucket_name = MEDIA_UPLOAD_FILESTORE_BUCKET
     publish_bucket_name = MEDIA_PUBLISHING_FILESTORE_BUCKET
@@ -231,6 +248,22 @@ class MediaContentInterest(InterestBase):
     @require_permission('delete_artefact', strip_auth=False)
     def delete_format(self, format_id, auth_user=None, session=None):
         pass
+
+    @with_db
+    @require_state((LifecycleStatus.NEW))
+    @require_permission('add_artefact', strip_auth=False)
+    def generate_from_provider(self, provider_id, args, auth_user=None, session=None):
+        if self.content_type != 'structured':
+            raise ContentTypeMismatchError(self.content_type, 'structured',
+                                           'add_artefact', self.id, self.name)
+
+        provider = get_interest(id=provider_id, type='content_provider', session=session).actual
+        generated = provider.generate(args, auth_user=auth_user, session=session)
+        for k, v in generated.items():
+            setattr(self.model_instance.content, k, v)
+        session.add(self.model_instance.content)
+        session.flush()
+        return self.model_instance.content
 
     def published(self):
         if self.status != LifecycleStatus.ACTIVE:

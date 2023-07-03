@@ -29,8 +29,11 @@ logger = log.get_logger(__name__, log.DEFAULT)
 
 
 class MediaContentInfoTModel(TendrilTBaseModel):
+    # TODO Split this into a union of types
     content_type: str
     bg_color: Optional[Any]
+    path: Optional[str]
+    args: Optional[dict]
     formats: List[Union[MediaContentFormatInfoFullTModel,
                         MediaContentFormatInfoTModel]] = []
     thumbnails: Optional[ThumbnailListingTModel]
@@ -115,7 +118,7 @@ class StructuredContentModel(ContentModel):
 
     def export(self, full=False):
         rv = super(StructuredContentModel, self).export(full=full)
-        rv['path'] = [self.path]
+        rv['path'] = self.path
         if self.args:
             rv['args'] = self.args
         return rv
