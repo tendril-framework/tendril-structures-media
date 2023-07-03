@@ -1,8 +1,8 @@
 
 
 from tendril.apiserver.templates.content import InterestContentRouterGenerator
-from tendril.structures.media import content_models
-from tendril.structures.media import content_types
+from tendril.structures.content import content_models
+from tendril.structures.content import content_types
 
 
 class ContentLibraryMixin(object):

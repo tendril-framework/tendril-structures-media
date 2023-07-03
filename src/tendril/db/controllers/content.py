@@ -8,7 +8,7 @@ from tendril.db.models.content_formats import FileMediaContentFormatModel
 from tendril.db.models.content_thumbnails import MediaContentFormatThumbnailModel
 from tendril.db.controllers.interests import get_interest
 from tendril.filestore.db.controller import get_stored_file
-from tendril.structures.media import content_models
+from tendril.structures.content import content_models
 
 
 def _type_discriminator(type):

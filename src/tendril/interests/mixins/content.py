@@ -18,7 +18,8 @@ from tendril.authz.roles.interests import require_permission
 from tendril.caching import tokens
 from tendril.caching.tokens import TokenStatus
 
-from tendril.structures.media import content_types
+from tendril.structures.content import providers
+from tendril.structures.content import content_types
 from tendril.db.models.content import ContentModel
 from tendril.db.controllers.content import create_content
 from tendril.db.controllers.content import create_content_format_file
