@@ -38,6 +38,7 @@ core_dependencies = [
     'av',
     'pdf2image',
     'asgiref',
+    'tendril-utils-media',
 ]
 
 install_requires = core_dependencies + ['wheel']
