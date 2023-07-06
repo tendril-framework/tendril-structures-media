@@ -200,33 +200,36 @@ class InterestContentRouterGenerator(ApiRouterGenerator):
                              response_model_exclude_none=True,
                              dependencies=[auth_spec(scopes=[f'{prefix}:read'])])
 
-        router.add_api_route("/{id}/formats/info/{format_id}", self.format_info, methods=["GET"],
-                             response_model=Union[MediaContentFormatInfoFullTModel, MediaContentFormatInfoTModel],
-                             response_model_exclude_none=True,
-                             dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
+        if 'media' in self._actual.accepted_types.keys():
+            router.add_api_route("/{id}/formats/info/{format_id}", self.format_info, methods=["GET"],
+                                 response_model=Union[MediaContentFormatInfoFullTModel, MediaContentFormatInfoTModel],
+                                 response_model_exclude_none=True,
+                                 dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
 
-        router.add_api_route("/{id}/formats/upload", self.upload_media_format, methods=["POST"],
-                             response_model=GenericTokenTModel,
-                             dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
+            router.add_api_route("/{id}/formats/upload", self.upload_media_format, methods=["POST"],
+                                 response_model=GenericTokenTModel,
+                                 dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
 
-        # router.add_api_route("/{id}/formats/delete", self.delete_media_format, methods=["POST"],
-        #                      # response_model=[],
-        #                      dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
+            # router.add_api_route("/{id}/formats/delete", self.delete_media_format, methods=["POST"],
+            #                      # response_model=[],
+            #                      dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
 
-        router.add_api_route("/{id}/provider/{provider_id}/generate", self.generate_provider_content, methods=['POST'],
-                             # response_model=,
-                             dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
+        if 'structured' in self._actual.accepted_types.keys():
+            router.add_api_route("/{id}/provider/{provider_id}/generate", self.generate_provider_content, methods=['POST'],
+                                 # response_model=,
+                                 dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
 
-        router.add_api_route("/{id}/sequence/duration", self.set_sequence_default_duration, methods=['POST'],
-                             response_model=SequenceDefaultDurationResponseTModel,
-                             dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
+        if 'sequence' in self._actual.accepted_types.keys():
+            router.add_api_route("/{id}/sequence/duration", self.set_sequence_default_duration, methods=['POST'],
+                                 response_model=SequenceDefaultDurationResponseTModel,
+                                 dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
 
-        router.add_api_route("/{id}/sequence/add", self.add_to_sequence, methods=['POST'],
-                             # response_model=,
-                             dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
+            router.add_api_route("/{id}/sequence/add", self.add_to_sequence, methods=['POST'],
+                                 # response_model=,
+                                 dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
 
-        router.add_api_route("/{id}/sequence/remove/{position}", self.remove_from_sequence, methods=['POST'],
-                             # response_model=,
-                             dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
+            router.add_api_route("/{id}/sequence/remove/{position}", self.remove_from_sequence, methods=['POST'],
+                                 # response_model=,
+                                 dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
 
         return [router]
