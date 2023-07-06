@@ -3,6 +3,7 @@
 import os
 from typing import Dict
 from typing import Union
+from typing import Optional
 from pydantic.fields import Field
 
 from fastapi import APIRouter
@@ -19,6 +20,7 @@ from tendril.authn.users import authn_dependency
 
 from tendril.apiserver.templates.base import ApiRouterGenerator
 from tendril.utils.pydantic import TendrilTORMModel
+from tendril.utils.pydantic import TendrilTBaseModel
 from tendril.utils.db import get_session
 
 from tendril.caching import tokens
@@ -37,6 +39,17 @@ from tendril.db.models.content import MediaContentInfoFullTModel
 
 class ContentTypeDetailTModel(TendrilTORMModel):
     type_description: str = Field(..., alias='display_name')
+
+
+class SequenceDefaultDurationResponseTModel(TendrilTBaseModel):
+    interest_id: int
+    default_duration: int
+
+
+class SequenceAddTModel(TendrilTBaseModel):
+    content_id: int
+    position: Optional[int]
+    duration: Optional[int]
 
 
 class InterestContentRouterGenerator(ApiRouterGenerator):
@@ -133,6 +146,44 @@ class InterestContentRouterGenerator(ApiRouterGenerator):
             interest: MediaContentInterest = self._actual.item(id=id, session=session)
             return interest.generate_from_provider(provider_id, args=args, auth_user=user, session=session)
 
+    async def set_sequence_default_duration(self, request:Request, id:int,
+                                            duration:int = 10000,
+                                            user: AuthUserModel = auth_spec()):
+        with get_session() as session:
+            interest: MediaContentInterest = self._actual.item(id=id, session=session)
+            return interest.sequence_set_default_duration(default_duration=duration, auth_user=user, session=session)
+
+    async def add_to_sequence(self, request:Request, id:int, item: SequenceAddTModel,
+                              full=True, user: AuthUserModel = auth_spec()):
+        with get_session() as session:
+            interest: MediaContentInterest = self._actual.item(id=id, session=session)
+            result = interest.sequence_add(**item.dict(), auth_user=user, session=session)
+
+        if not result:
+            raise Exception
+
+        with get_session() as session:
+            interest: MediaContentInterest = self._actual.item(id=id, session=session)
+            return interest.content_information(full=full, auth_user=user, session=session)
+
+    async def remove_from_sequence(self, request:Request, id:int, position:int,
+                                   full=True, user: AuthUserModel = auth_spec()):
+        with get_session() as session:
+            interest: MediaContentInterest = self._actual.item(id=id, session=session)
+            result = interest.sequence_remove(position=position, auth_user=user, session=session)
+
+        if not result:
+            raise Exception
+
+        with get_session() as session:
+            interest: MediaContentInterest = self._actual.item(id=id, session=session)
+            return interest.content_information(full=full, auth_user=user, session=session)
+
+    async def change_item_duration(self, request:Request, id:int,
+                                   position:int, duration:int,
+                                   user: AuthUserModel = auth_spec()):
+        pass
+
     def generate(self, name):
         desc = f'Content API for {name} Interests'
         prefix = self._actual.interest_class.model.role_spec.prefix
@@ -146,10 +197,12 @@ class InterestContentRouterGenerator(ApiRouterGenerator):
 
         router.add_api_route("/{id}/content_info", self.content_info, methods=["GET"],
                              response_model=Union[MediaContentInfoFullTModel, MediaContentInfoTModel],
+                             response_model_exclude_none=True,
                              dependencies=[auth_spec(scopes=[f'{prefix}:read'])])
 
         router.add_api_route("/{id}/formats/info/{format_id}", self.format_info, methods=["GET"],
                              response_model=Union[MediaContentFormatInfoFullTModel, MediaContentFormatInfoTModel],
+                             response_model_exclude_none=True,
                              dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
 
         router.add_api_route("/{id}/formats/upload", self.upload_media_format, methods=["POST"],
@@ -161,6 +214,18 @@ class InterestContentRouterGenerator(ApiRouterGenerator):
         #                      dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
 
         router.add_api_route("/{id}/provider/{provider_id}/generate", self.generate_provider_content, methods=['POST'],
+                             # response_model=,
+                             dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
+
+        router.add_api_route("/{id}/sequence/duration", self.set_sequence_default_duration, methods=['POST'],
+                             response_model=SequenceDefaultDurationResponseTModel,
+                             dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
+
+        router.add_api_route("/{id}/sequence/add", self.add_to_sequence, methods=['POST'],
+                             # response_model=,
+                             dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
+
+        router.add_api_route("/{id}/sequence/remove/{position}", self.remove_from_sequence, methods=['POST'],
                              # response_model=,
                              dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
 

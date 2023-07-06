@@ -8,12 +8,14 @@ from sqlalchemy import Column
 from sqlalchemy import String
 from sqlalchemy import Integer
 from sqlalchemy import ForeignKey
+from sqlalchemy import UniqueConstraint
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy_json import mutable_json_type
+
 
 from tendril.utils.db import DeclBase
 from tendril.utils.db import BaseMixin
@@ -34,13 +36,27 @@ class MediaContentInfoTModel(TendrilTBaseModel):
     bg_color: Optional[Any]
     path: Optional[str]
     args: Optional[dict]
-    formats: List[Union[MediaContentFormatInfoFullTModel,
-                        MediaContentFormatInfoTModel]] = []
+    formats: Optional[List[Union[MediaContentFormatInfoFullTModel,
+                                 MediaContentFormatInfoTModel]]]
     thumbnails: Optional[ThumbnailListingTModel]
+    default_duration: Optional[int]
+    contents: Optional[List['SequenceMemberTModel']]
 
 
 class MediaContentInfoFullTModel(MediaContentInfoTModel):
+    estimated_duration: Any
     published: bool
+
+
+class SequenceMemberTModel(TendrilTBaseModel):
+    position: int
+    duration: Optional[int]
+    content: Union[MediaContentInfoFullTModel,
+                   MediaContentInfoTModel]
+
+
+MediaContentInfoTModel.update_forward_refs()
+MediaContentInfoFullTModel.update_forward_refs()
 
 
 class ContentModel(DeclBase, BaseMixin, TimestampMixin):
@@ -68,6 +84,7 @@ class ContentModel(DeclBase, BaseMixin, TimestampMixin):
 
     def export(self, full=False):
         rv = {'content_type': self.content_type}
+        rv['estimated_duration'] = self.estimated_duration()
         if self.bg_color:
             rv['bg_color'] = self.bg_color
         return rv
@@ -101,7 +118,15 @@ class MediaContentModel(ContentModel):
         return rv
 
     def estimated_duration(self):
-        return max([x.estimated_duration for x in self.formats])
+        durations = [x.duration for x in self.formats]
+        simple_durations = [x for x in durations if x > 0]
+        step_durations = [x for x in durations if x < 0]
+        if not len(step_durations):
+            return max(simple_durations)
+        if not len(simple_durations):
+            return min(step_durations)
+        step_durations = [x * -1 * 10000 for x in step_durations]
+        return max(max([simple_durations, step_durations]))
 
 
 class StructuredContentModel(ContentModel):
@@ -132,7 +157,7 @@ class SequenceContentModel(ContentModel):
     type_description = "Sequence of other content types"
 
     id = Column(Integer, ForeignKey("Content.id"), primary_key=True)
-    default_duration = Column(Integer, nullable=False, default=10)
+    default_duration = Column(Integer, nullable=False, default=10000)
 
     contents: Mapped[List["SequenceContentAssociationModel"]] = \
         relationship(order_by="SequenceContentAssociationModel.position")
@@ -148,16 +173,31 @@ class SequenceContentModel(ContentModel):
         return rv
 
     def estimated_duration(self):
-        contents = self.contents
-        return sum([x.estimated_duration() or self.default_duration
-                    for x in contents]) + len(contents)
+        durations = [x.duration or x.content.estimated_duration() for x in self.contents]
+        actual_durations = []
+        for duration in durations:
+            if duration < 0:
+                padding = 0
+                if duration != -1:
+                    padding = (-1 - duration) * 1000
+                duration = self.default_duration * -1 * duration + padding
+
+            actual_durations.append(duration)
+        return sum(actual_durations) + 1000 * len(durations)
 
 
 class SequenceContentAssociationModel(DeclBase):
     __tablename__ = "SequenceContentAssociation"
     sequence_id: Mapped[int] = mapped_column(ForeignKey("SequenceContent.id"), primary_key=True)
-    content_id: Mapped[int] = mapped_column(ForeignKey("Content.id"), primary_key=True)
-    position: Mapped[int]
+    content_id: Mapped[int] = mapped_column(ForeignKey("Content.id"))
+    position: Mapped[int] = mapped_column(primary_key=True)
     duration: Mapped[Optional[int]]
-    sequence: Mapped[SequenceContentModel] = relationship(back_populates="contents", foreign_keys=[sequence_id])
-    content: Mapped[ContentModel] = relationship(back_populates="sequence_usages", foreign_keys=[content_id])
+    sequence: Mapped[SequenceContentModel] = relationship(back_populates="contents", foreign_keys=[sequence_id], lazy='selectin')
+    content: Mapped[ContentModel] = relationship(back_populates="sequence_usages", foreign_keys=[content_id], lazy='joined')
+
+    def export(self, full=False):
+        return {
+            'position': self.position,
+            'duration': self.duration,
+            'content': self.content.export(full=full)
+        }

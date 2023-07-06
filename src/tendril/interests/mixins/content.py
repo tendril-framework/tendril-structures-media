@@ -21,12 +21,15 @@ from tendril.authz.roles.interests import require_permission
 from tendril.caching import tokens
 from tendril.caching.tokens import TokenStatus
 
-from tendril.structures.content import providers
 from tendril.structures.content import content_types
 from tendril.db.models.content import ContentModel
 from tendril.db.controllers.content import create_content
 from tendril.db.controllers.content import create_content_format_file
 from tendril.db.controllers.content import create_content_format_thumbnail
+from tendril.db.controllers.content import sequence_next_position
+from tendril.db.controllers.content import sequence_heal_positions
+from tendril.db.controllers.content import sequence_add_content
+from tendril.db.controllers.content import sequence_remove_content
 from tendril.common.content.exceptions import ContentNotReady
 
 from tendril.utils.parsers.media.info import get_media_info
@@ -64,6 +67,7 @@ class MediaContentInterest(InterestBase):
         self._upload_bucket = None
         self._publish_bucket = None
 
+    # Common
     @property
     def content_type(self):
         if not self._content_type:
@@ -81,6 +85,57 @@ class MediaContentInterest(InterestBase):
         self._commit_to_db(session=session)
 
     @property
+    def content(self):
+        return self.model_instance.content
+
+    def published(self):
+        if self.status != LifecycleStatus.ACTIVE:
+            return False
+        content = self.model_instance.content
+        if hasattr(content, "formats"):
+            for fmt in self.model_instance.content.formats:
+                if hasattr(fmt, 'stored_file'):
+                    if fmt.stored_file.bucket != self.publish_bucket:
+                        return False
+        return True
+
+    @with_db
+    @require_state((LifecycleStatus.ACTIVE, LifecycleStatus.APPROVAL, LifecycleStatus.NEW))
+    @require_permission('read_artefacts', strip_auth=False)
+    def content_information(self, full=False, auth_user=None, session=None):
+        if not self._model_instance.content:
+            raise ContentNotReady('read_content_info', self.id, self.name)
+        else:
+            content: ContentModel = self._model_instance.content
+            rv = content.export(full=full)
+            if full:
+                if 'formats' in rv.keys():
+                    for fmt_info in rv['formats']:
+                        fmt_info['published'] = self.format_published(fmt_info['format_id'])
+                rv['published'] = self.published()
+            return rv
+
+    @with_db
+    @require_state((LifecycleStatus.ACTIVE, LifecycleStatus.APPROVAL, LifecycleStatus.NEW))
+    @require_permission('read_artefacts', strip_auth=False)
+    def estimated_duration(self, auth_user=None, session=None):
+        return self._model_instance.content.estimated_duration()
+
+    @with_db
+    def _commit_to_db(self, must_create=False, can_create=True, session=None):
+        super(MediaContentInterest, self)._commit_to_db(must_create=must_create,
+                                                        can_create=can_create,
+                                                        session=session)
+        if not self.model_instance.content_id:
+            content = create_content(type=self._content_type, session=session)
+            self.model_instance.content_id = content.id
+            session.add(self.model_instance)
+            session.commit()
+            session.flush()
+
+    # Media Content
+
+    @property
     def upload_bucket(self):
         if not self._upload_bucket:
             self._upload_bucket = buckets.get_bucket(self.upload_bucket_name)
@@ -91,16 +146,6 @@ class MediaContentInterest(InterestBase):
         if not self._publish_bucket:
             self._publish_bucket = buckets.get_bucket(self.publish_bucket_name)
         return self._publish_bucket
-
-    # @with_db
-    # @require_state((LifecycleStatus.NEW))
-    # @require_permission('add_artefact', strip_auth=False)
-    # def create_content(self, content_type, auth_user=None, session=None):
-    #     print("CREATE_CONTENT", content_type, self)
-
-    @property
-    def content(self):
-        return self.model_instance.content
 
     @property
     def formats(self):
@@ -249,6 +294,8 @@ class MediaContentInterest(InterestBase):
     def delete_format(self, format_id, auth_user=None, session=None):
         pass
 
+    # Content Providers
+
     @with_db
     @require_state((LifecycleStatus.NEW))
     @require_permission('add_artefact', strip_auth=False)
@@ -265,40 +312,66 @@ class MediaContentInterest(InterestBase):
         session.flush()
         return self.model_instance.content
 
-    def published(self):
-        if self.status != LifecycleStatus.ACTIVE:
-            return False
-        content = self.model_instance.content
-        if hasattr(content, "formats"):
-            for fmt in self.model_instance.content.formats:
-                if hasattr(fmt, 'stored_file'):
-                    if fmt.stored_file.bucket != self.publish_bucket:
-                        return False
+    # Content Sequence
+
+    @with_db
+    @require_state((LifecycleStatus.NEW, LifecycleStatus.APPROVAL, LifecycleStatus.ACTIVE))
+    @require_permission('add_artefact', strip_auth=False)
+    def sequence_set_default_duration(self, default_duration=10, auth_user=None, session=None):
+        if self.content_type != 'sequence':
+            raise ContentTypeMismatchError(self.content_type, 'sequence',
+                                           'add_artefact', self.id, self.name)
+
+        if not isinstance(default_duration, int) or default_duration < 0:
+            raise ValueError("Expecting a non-negative integer for duration")
+
+        self.model_instance.content.default_duration = default_duration
+        session.add(self.model_instance.content)
+        session.flush()
+        return {'interest_id': self.id,
+                'default_duration': self.model_instance.content.default_duration}
+
+    @with_db
+    @require_state((LifecycleStatus.NEW))
+    @require_permission('add_artefact', strip_auth=False)
+    def sequence_add(self, content_id, position=None, duration=None, auth_user=None, session=None):
+        if self.content_type != 'sequence':
+            raise ContentTypeMismatchError(self.content_type, 'sequence',
+                                           'add_artefact', self.id, self.name)
+
+        # Get Content and Verify Access
+        content = get_interest(content_id, type=self.type_name, session=session).actual
+        if not content.check_user_access(auth_user, 'read', session=session):
+            raise PermissionError("User does not seem to have access to the underlying content. "
+                                  "Cannot add to sequence.")
+
+        if not duration:
+            duration = content.estimated_duration(auth_user=auth_user, session=session)
+
+        if not duration:
+            raise ValueError("We need a duration, however none is provided and the content does "
+                             "not provide it intrinsically.")
+
+        # Create and commit Association Model
+        sequence_add_content(id=self.model_instance.content_id,
+                             content=content.model_instance.content_id,
+                             position=position,
+                             duration=duration,
+                             session=session)
+
+        sequence_heal_positions(id=self.model_instance.content_id, session=session)
         return True
 
     @with_db
-    @require_state((LifecycleStatus.ACTIVE, LifecycleStatus.APPROVAL, LifecycleStatus.NEW))
-    @require_permission('read_artefacts', strip_auth=False)
-    def content_information(self, full=False, auth_user=None, session=None):
-        if not self._model_instance.content:
-            raise ContentNotReady('read_content_info', self.id, self.name)
-        else:
-            content: ContentModel = self._model_instance.content
-            rv = content.export(full=full)
-            if full:
-                for fmt_info in rv['formats']:
-                    fmt_info['published'] = self.format_published(fmt_info['format_id'])
-                rv['published'] = self.published()
-            return rv
+    @require_state((LifecycleStatus.NEW))
+    @require_permission('add_artefact', strip_auth=False)
+    def sequence_remove(self, position=None, auth_user=None, session=None):
+        if self.content_type != 'sequence':
+            raise ContentTypeMismatchError(self.content_type, 'sequence',
+                                           'add_artefact', self.id, self.name)
 
-    @with_db
-    def _commit_to_db(self, must_create=False, can_create=True, session=None):
-        super(MediaContentInterest, self)._commit_to_db(must_create=must_create,
-                                                        can_create=can_create,
-                                                        session=session)
-        if not self.model_instance.content_id:
-            content = create_content(type=self._content_type, session=session)
-            self.model_instance.content_id = content.id
-            session.add(self.model_instance)
-            session.commit()
-            session.flush()
+        sequence_remove_content(id=self.model_instance.content_id,
+                                position=position,
+                                session=session)
+        sequence_heal_positions(id=self.model_instance.content_id, session=session)
+        return True
