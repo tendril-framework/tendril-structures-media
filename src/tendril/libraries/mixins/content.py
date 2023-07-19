@@ -7,7 +7,7 @@ from tendril.structures.content import content_types
 
 class ContentLibraryMixin(object):
     media_types_allowed = content_types
-    additional_api_generators = [InterestContentRouterGenerator]
+    _additional_api_generators = [InterestContentRouterGenerator]
 
     def __init__(self, *args, **kwargs):
         super(ContentLibraryMixin, self).__init__(*args, **kwargs)
