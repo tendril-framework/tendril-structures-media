@@ -83,8 +83,8 @@ class ContentModel(DeclBase, BaseMixin, TimestampMixin):
     }
 
     def export(self, full=False):
-        rv = {'content_type': self.content_type}
-        rv['estimated_duration'] = self.estimated_duration()
+        rv = {'content_type': self.content_type,
+              'estimated_duration': self.estimated_duration()}
         if self.bg_color:
             rv['bg_color'] = self.bg_color
         return rv
@@ -121,12 +121,14 @@ class MediaContentModel(ContentModel):
         durations = [x.duration for x in self.formats]
         simple_durations = [x for x in durations if x > 0]
         step_durations = [x for x in durations if x < 0]
+        if not len(simple_durations) and not len(step_durations):
+            return 0
         if not len(step_durations):
             return max(simple_durations)
         if not len(simple_durations):
             return min(step_durations)
         step_durations = [x * -1 * 10000 for x in step_durations]
-        return max(max([simple_durations, step_durations]))
+        return max(simple_durations + step_durations)
 
 
 class StructuredContentModel(ContentModel):
