@@ -1,6 +1,7 @@
 
 
 import os
+import asyncio
 from asgiref.sync import async_to_sync
 
 from httpx import HTTPStatusError
@@ -12,7 +13,6 @@ from tendril.filestore import buckets
 from tendril.config import MEDIA_UPLOAD_FILESTORE_BUCKET
 from tendril.config import MEDIA_PUBLISHING_FILESTORE_BUCKET
 
-from tendril.utils.db import with_db
 from tendril.interests.base import InterestBase
 from tendril.common.states import LifecycleStatus
 from tendril.authz.roles.interests import require_state
@@ -36,6 +36,7 @@ from tendril.utils.parsers.media.info import get_media_info
 from tendril.utils.parsers.media.thumbnails import generate_thumbnails
 
 from tendril.utils.fsutils import TEMPDIR
+from tendril.utils.db import with_db
 from tendril.utils import log
 logger = log.get_logger(__name__, log.DEFAULT)
 
@@ -88,6 +89,48 @@ class MediaContentInterest(InterestBase):
     def content(self):
         return self.model_instance.content
 
+    @with_db
+    def activate(self, background_tasks=None, auth_user=None, session=None):
+        result, msg = super().activate(background_tasks=background_tasks,
+                                       auth_user=auth_user, session=session)
+
+        if not self.model_instance.status == LifecycleStatus.ACTIVE:
+            return result, msg
+
+        publishable = self.publishable()
+
+        if background_tasks:
+            background_tasks.add_task(self._publish_files(publishable))
+        else:
+            asyncio.ensure_future(self._publish_files(publishable))
+        return result, msg
+
+    async def _publish_files(self, stored_files):
+        for stored_file in stored_files:
+            logger.info(f"Publishing file {stored_file.filename}")
+            try:
+                upload_response = await self.upload_bucket.move(
+                    filename=stored_file.filename,
+                    target_bucket=self.publish_bucket_name,
+                    actual_user=None,
+                )
+            except HTTPStatusError as e:
+                self._report_filestore_error(None, e, "Publishing media file")
+                continue
+
+    def publishable(self):
+        content = self.model_instance.content
+        rv = []
+        if hasattr(content, "formats"):
+            for fmt in self.model_instance.content.formats:
+                if hasattr(fmt, 'stored_file'):
+                    if fmt.stored_file.bucket.name == self.upload_bucket_name:
+                        rv.append(fmt.stored_file)
+                for thumbnail in fmt.thumbnails:
+                    if thumbnail.stored_file.bucket.name == self.upload_bucket_name:
+                        rv.append(thumbnail.stored_file)
+        return rv
+
     def published(self):
         if self.status != LifecycleStatus.ACTIVE:
             return False
@@ -95,7 +138,7 @@ class MediaContentInterest(InterestBase):
         if hasattr(content, "formats"):
             for fmt in self.model_instance.content.formats:
                 if hasattr(fmt, 'stored_file'):
-                    if fmt.stored_file.bucket != self.publish_bucket:
+                    if fmt.stored_file.bucket.name != self.publish_bucket_name:
                         return False
         return True
 
@@ -274,7 +317,7 @@ class MediaContentInterest(InterestBase):
     def format_published(self, format_id):
         fmt = self.get_format(format_id)
         if hasattr(fmt, 'stored_file'):
-            if fmt.stored_file.bucket != self.publish_bucket:
+            if fmt.stored_file.bucket.name != self.publish_bucket_name:
                 return False
         return True
 
