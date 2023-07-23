@@ -24,6 +24,9 @@ from tendril.utils import log
 logger = log.get_logger(__name__, log.DEFAULT)
 
 
+class StoredFileHashTModel(TendrilTBaseModel):
+    sha256: Optional[str]
+
 class MediaContentFormatInfoTModel(TendrilTBaseModel):
     format_class: str
     format_id: int
@@ -31,6 +34,7 @@ class MediaContentFormatInfoTModel(TendrilTBaseModel):
     height: Optional[int]
     duration: Optional[int]
     uri: str
+    hash: StoredFileHashTModel
     published: Optional[bool]
 
 
@@ -122,6 +126,7 @@ class FileMediaContentFormatModel(MediaContentFormatModel):
     def export(self, full=False):
         rv = super(FileMediaContentFormatModel, self).export(full=full)
         rv['uri'] = self.stored_file.expose_uri
+        rv['hash'] = self.stored_file.fileinfo['hash']
         return rv
 
     __mapper_args__ = {
