@@ -61,6 +61,7 @@ class MediaContentInterest(InterestBase):
     publish_bucket_name = MEDIA_PUBLISHING_FILESTORE_BUCKET
     additional_creation_fields = ['content_type']
     additional_export_fields = ['content_type']
+    additional_activation_checks = ['check_content_usable']
 
     def __init__(self, *args, content_type=None, **kwargs):
         self._content_type = content_type
@@ -88,6 +89,10 @@ class MediaContentInterest(InterestBase):
     @property
     def content(self):
         return self.model_instance.content
+
+    @with_db
+    def check_content_usable(self, auth_user=None, session=None):
+        return self.content.is_usable()
 
     @with_db
     def activate(self, background_tasks=None, auth_user=None, session=None):
@@ -144,7 +149,7 @@ class MediaContentInterest(InterestBase):
 
     @with_db
     @require_state((LifecycleStatus.ACTIVE, LifecycleStatus.APPROVAL, LifecycleStatus.NEW))
-    @require_permission('read_artefacts', strip_auth=False)
+    @require_permission('read_artefacts', strip_auth=False, required=False)
     def content_information(self, full=False, auth_user=None, session=None):
         if not self._model_instance.content:
             raise ContentNotReady('read_content_info', self.id, self.name)

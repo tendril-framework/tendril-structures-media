@@ -89,6 +89,9 @@ class ContentModel(DeclBase, BaseMixin, TimestampMixin):
             rv['bg_color'] = self.bg_color
         return rv
 
+    def is_usable(self):
+        return False
+
     def estimated_duration(self):
         return None
 
@@ -130,6 +133,9 @@ class MediaContentModel(ContentModel):
         step_durations = [x * -1 * 10000 for x in step_durations]
         return max(simple_durations + step_durations)
 
+    def is_usable(self):
+        return len(self.formats) > 0
+
 
 class StructuredContentModel(ContentModel):
     type_name = 'structured'
@@ -152,6 +158,10 @@ class StructuredContentModel(ContentModel):
 
     def estimated_duration(self):
         return None
+
+    def is_usable(self):
+        # TODO Check if the path corresponds to a valid provider as well?
+        return self.path is not None
 
 
 class SequenceContentModel(ContentModel):
@@ -186,6 +196,9 @@ class SequenceContentModel(ContentModel):
 
             actual_durations.append(duration)
         return sum(actual_durations) + 1000 * len(durations)
+
+    def is_usable(self):
+        return len(self.contents) > 0 and all([x.is_usable() for x in self.contents])
 
 
 class SequenceContentAssociationModel(DeclBase):
