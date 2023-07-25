@@ -105,7 +105,7 @@ class MediaContentInterest(InterestBase):
         publishable = self.publishable()
 
         if background_tasks:
-            background_tasks.add_task(self._publish_files(publishable))
+            background_tasks.add_task(self._publish_files, publishable)
         else:
             asyncio.ensure_future(self._publish_files(publishable))
         return result, msg
