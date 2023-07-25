@@ -61,7 +61,8 @@ class MediaContentInterest(InterestBase):
     publish_bucket_name = MEDIA_PUBLISHING_FILESTORE_BUCKET
     additional_creation_fields = ['content_type']
     additional_export_fields = ['content_type']
-    additional_activation_checks = ['check_content_usable']
+    additional_activation_checks = ['check_content_usable',
+                                    'check_components_activated']
 
     def __init__(self, *args, content_type=None, **kwargs):
         self._content_type = content_type
@@ -93,6 +94,15 @@ class MediaContentInterest(InterestBase):
     @with_db
     def check_content_usable(self, auth_user=None, session=None):
         return self.content.is_usable()
+
+    @with_db
+    def check_components_activated(self, auth_user=None, session=None):
+        if not hasattr(self.content, 'contents'):
+            return True
+        for content in self.content.contents:
+            if content.status != LifecycleStatus.ACTIVE:
+                return False
+        return True
 
     @with_db
     def activate(self, background_tasks=None, auth_user=None, session=None):

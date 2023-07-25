@@ -198,7 +198,7 @@ class SequenceContentModel(ContentModel):
         return sum(actual_durations) + 1000 * len(durations)
 
     def is_usable(self):
-        return len(self.contents) > 0 and all([x.is_usable() for x in self.contents])
+        return len(self.contents) > 0 and all([x.content.is_usable() for x in self.contents])
 
 
 class SequenceContentAssociationModel(DeclBase):
