@@ -100,7 +100,7 @@ class MediaContentInterest(InterestBase):
         if not hasattr(self.content, 'contents'):
             return True
         for content in self.content.contents:
-            if content.status != LifecycleStatus.ACTIVE:
+            if content.content.status != LifecycleStatus.ACTIVE:
                 return False
         return True
 
