@@ -61,8 +61,7 @@ class MediaContentInterest(InterestBase):
     publish_bucket_name = MEDIA_PUBLISHING_FILESTORE_BUCKET
     additional_creation_fields = ['content_type']
     additional_export_fields = ['content_type']
-    additional_activation_checks = ['check_content_usable',
-                                    'check_components_activated']
+    additional_activation_checks = ['check_content_usable']
 
     def __init__(self, *args, content_type=None, **kwargs):
         self._content_type = content_type
@@ -94,15 +93,6 @@ class MediaContentInterest(InterestBase):
     @with_db
     def check_content_usable(self, auth_user=None, session=None):
         return self.content.is_usable()
-
-    @with_db
-    def check_components_activated(self, auth_user=None, session=None):
-        if not hasattr(self.content, 'contents'):
-            return True
-        for content in self.content.contents:
-            if content.content.status != LifecycleStatus.ACTIVE:
-                return False
-        return True
 
     @with_db
     def activate(self, background_tasks=None, auth_user=None, session=None):
@@ -402,6 +392,9 @@ class MediaContentInterest(InterestBase):
         if not content.check_user_access(auth_user, 'read', session=session):
             raise PermissionError("User does not seem to have access to the underlying content. "
                                   "Cannot add to sequence.")
+
+        if not content.status == LifecycleStatus.ACTIVE:
+            raise ValueError("The content must be active before it can be added to a sequence.")
 
         if not duration:
             duration = content.estimated_duration(auth_user=auth_user, session=session)
