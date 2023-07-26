@@ -8,7 +8,6 @@ from sqlalchemy import Column
 from sqlalchemy import String
 from sqlalchemy import Integer
 from sqlalchemy import ForeignKey
-from sqlalchemy import UniqueConstraint
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
@@ -130,7 +129,7 @@ class MediaContentModel(ContentModel):
             return max(simple_durations)
         if not len(simple_durations):
             return min(step_durations)
-        step_durations = [x * -1 * 10000 for x in step_durations]
+        step_durations = [x * -1 * 10 for x in step_durations]
         return max(simple_durations + step_durations)
 
     def is_usable(self):
@@ -169,7 +168,7 @@ class SequenceContentModel(ContentModel):
     type_description = "Sequence of other content types"
 
     id = Column(Integer, ForeignKey("Content.id"), primary_key=True)
-    default_duration = Column(Integer, nullable=False, default=10000)
+    default_duration = Column(Integer, nullable=False, default=10)
 
     contents: Mapped[List["SequenceContentAssociationModel"]] = \
         relationship(order_by="SequenceContentAssociationModel.position")
@@ -189,13 +188,9 @@ class SequenceContentModel(ContentModel):
         actual_durations = []
         for duration in durations:
             if duration < 0:
-                padding = 0
-                if duration != -1:
-                    padding = (-1 - duration) * 1000
-                duration = self.default_duration * -1 * duration + padding
-
+                duration = self.default_duration * -1 * duration
             actual_durations.append(duration)
-        return sum(actual_durations) + 1000 * len(durations)
+        return sum(actual_durations) + len(durations)
 
     def is_usable(self):
         return len(self.contents) > 0 and all([x.content.is_usable() for x in self.contents])

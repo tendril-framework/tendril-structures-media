@@ -88,10 +88,10 @@ class MediaContentFormatModel(DeclBase, BaseMixin, TimestampMixin):
     def estimated_duration(self):
         if self.duration:
             if self.duration < 0:
-                return self.duration * -10000
+                return self.duration * -10
             return self.duration
         else:
-            return 10000
+            return 10
 
     __mapper_args__ = {
         "polymorphic_identity": format_class_name,
