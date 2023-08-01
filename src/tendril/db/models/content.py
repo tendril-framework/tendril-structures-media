@@ -81,7 +81,7 @@ class ContentModel(DeclBase, BaseMixin, TimestampMixin):
         "polymorphic_on": content_type
     }
 
-    def export(self, full=False):
+    def export(self, full=False, explicit_durations_only=False):
         rv = {'content_type': self.content_type,
               'estimated_duration': self.estimated_duration()}
         if self.bg_color:
@@ -110,8 +110,8 @@ class MediaContentModel(ContentModel):
         "polymorphic_identity": type_name
     }
 
-    def export(self, full=False):
-        rv = super(MediaContentModel, self).export(full=full)
+    def export(self, full=False, explicit_durations_only=False):
+        rv = super(MediaContentModel, self).export(full=full, explicit_durations_only=explicit_durations_only)
         rv['formats'] = [x.export(full=full) for x in self.formats]
         for fmt in self.formats:
             if len(fmt.thumbnails):
@@ -148,8 +148,8 @@ class StructuredContentModel(ContentModel):
         "polymorphic_identity": type_name
     }
 
-    def export(self, full=False):
-        rv = super(StructuredContentModel, self).export(full=full)
+    def export(self, full=False, explicit_durations_only=False):
+        rv = super(StructuredContentModel, self).export(full=full, explicit_durations_only=explicit_durations_only)
         rv['path'] = self.path
         if self.args:
             rv['args'] = self.args
@@ -177,10 +177,10 @@ class SequenceContentModel(ContentModel):
         "polymorphic_identity": type_name
     }
 
-    def export(self, full=False):
-        rv = super(SequenceContentModel, self).export(full=full)
+    def export(self, full=False, explicit_durations_only=False):
+        rv = super(SequenceContentModel, self).export(full=full, explicit_durations_only=explicit_durations_only)
         rv['default_duration'] = self.default_duration
-        rv['contents'] = [x.export(full=full) for x in self.contents]
+        rv['contents'] = [x.export(full=full, explicit_durations_only=explicit_durations_only) for x in self.contents]
         return rv
 
     def estimated_duration(self):

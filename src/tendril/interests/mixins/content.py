@@ -397,9 +397,9 @@ class MediaContentInterest(InterestBase):
             raise ValueError("The content must be active before it can be added to a sequence.")
 
         if not duration:
-            duration = content.estimated_duration(auth_user=auth_user, session=session)
+            _duration = content.estimated_duration(auth_user=auth_user, session=session)
 
-        if not duration:
+        if not _duration:
             raise ValueError("We need a duration, however none is provided and the content does "
                              "not provide it intrinsically.")
 
