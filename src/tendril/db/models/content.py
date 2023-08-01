@@ -205,7 +205,7 @@ class SequenceContentAssociationModel(DeclBase):
     sequence: Mapped[SequenceContentModel] = relationship(back_populates="contents", foreign_keys=[sequence_id], lazy='selectin')
     content: Mapped[ContentModel] = relationship(back_populates="sequence_usages", foreign_keys=[content_id], lazy='joined')
 
-    def export(self, full=False):
+    def export(self, full=False, explicit_durations_only=False):
         return {
             'position': self.position,
             'duration': self.duration,
