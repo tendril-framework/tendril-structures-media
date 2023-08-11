@@ -5,6 +5,8 @@ from typing import Dict
 from typing import Union
 from typing import Optional
 from pydantic.fields import Field
+from inflection import singularize
+from inflection import titleize
 
 from fastapi import APIRouter
 from fastapi import Request
@@ -185,7 +187,7 @@ class InterestContentRouterGenerator(ApiRouterGenerator):
         pass
 
     def generate(self, name):
-        desc = f'Content API for {name} Interests'
+        desc = f'Content API for {titleize(singularize(name))} Interests'
         prefix = self._actual.interest_class.model.role_spec.prefix
         router = APIRouter(prefix=f'/{name}', tags=[desc],
                            dependencies=[Depends(authn_dependency)])
