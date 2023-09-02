@@ -53,6 +53,24 @@ def create_content(id=None, type=None, session=None, **kwargs):
 
 
 @with_db
+def create_content_format_thumbnail(id=None, stored_file_id=None,
+                                    width=None, height=None, session=None):
+    try:
+        thumbnail_instance = MediaContentFormatThumbnailModel(
+            format_id=id,
+            width=width,
+            height=height,
+            stored_file_id=stored_file_id
+        )
+        session.add(thumbnail_instance)
+        session.flush()
+        return thumbnail_instance
+    except NoResultFound:
+        raise ValueError(f"Could not find a content format "
+                         f"with the provided id {id}")
+
+
+@with_db
 def create_content_format_file(id=None, stored_file_id=None,
                                width=None, height=None, duration=None,
                                info=None, session=None):
@@ -75,21 +93,29 @@ def create_content_format_file(id=None, stored_file_id=None,
 
 
 @with_db
-def create_content_format_thumbnail(id=None, stored_file_id=None,
-                                    width=None, height=None, session=None):
+def get_format_by_stored_file(stored_file_id=None, raise_if_none=True, session=None):
+    filters = []
+    filters.append(FileMediaContentFormatModel.stored_file_id == stored_file_id)
+    q = session.query(FileMediaContentFormatModel).filter(*filters)
     try:
-        thumbnail_instance = MediaContentFormatThumbnailModel(
-            format_id=id,
-            width=width,
-            height=height,
-            stored_file_id=stored_file_id
-        )
-        session.add(thumbnail_instance)
-        session.flush()
-        return thumbnail_instance
+        return q.one()
     except NoResultFound:
-        raise ValueError(f"Could not find a content format "
-                         f"with the provided id {id}")
+        if raise_if_none:
+            raise
+        return None
+
+
+@with_db
+def get_format_by_filename(filename=None, bucket=None, session=None):
+    stored_file = get_stored_file(filename=filename, bucket=bucket, session=session)
+    return get_format_by_stored_file(stored_file_id=stored_file.id, session=session)
+
+
+@with_db
+def get_content_by_filename(filename=None, content_type=None, bucket=None, session=None):
+    format = get_format_by_filename(filename=filename, bucket=bucket, session=session)
+    return get_content(id=format.content_id, type=content_type, session=session)
+
 
 @with_db
 def sequence_next_position(id=None, session=None):
