@@ -66,6 +66,8 @@ class ContentModel(DeclBase, BaseMixin, TimestampMixin):
 
     bg_color = Column(String(20))
 
+    # TODO device_content and advertisement are instance specific.
+    #  These need to be moved into sxm-core somehow.
     @declared_attr
     def device_content(cls):
         return relationship("DeviceContentModel", uselist=False, back_populates='content', lazy='select')
@@ -73,6 +75,10 @@ class ContentModel(DeclBase, BaseMixin, TimestampMixin):
     @declared_attr
     def advertisement(cls):
         return relationship("AdvertisementModel", uselist=False, back_populates='content', lazy='select')
+
+    @property
+    def interest(self):
+        return self.advertisement or self.device_content
 
     sequence_usages: Mapped[List["SequenceContentAssociationModel"]] = relationship()
 

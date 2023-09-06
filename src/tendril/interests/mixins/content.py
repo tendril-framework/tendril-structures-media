@@ -28,9 +28,12 @@ from tendril.db.controllers.content import create_content_format_file
 from tendril.db.controllers.content import create_content_format_thumbnail
 from tendril.db.controllers.content import sequence_next_position
 from tendril.db.controllers.content import sequence_heal_positions
+from tendril.db.controllers.content import sequence_get_contents
 from tendril.db.controllers.content import sequence_add_content
 from tendril.db.controllers.content import sequence_remove_content
 from tendril.common.content.exceptions import ContentNotReady
+from tendril.common.interests.representations import rewrap_interest
+from tendril.common.interests.representations import ExportLevel
 
 from tendril.utils.parsers.media.info import get_media_info
 from tendril.utils.parsers.media.thumbnails import generate_thumbnails
@@ -378,6 +381,30 @@ class MediaContentInterest(InterestBase):
         session.flush()
         return {'interest_id': self.id,
                 'default_duration': self.model_instance.content.default_duration}
+
+    @with_db
+    @require_state((LifecycleStatus.NEW, LifecycleStatus.APPROVAL, LifecycleStatus.ACTIVE))
+    @require_permission('read', strip_auth=False)
+    def sequence_get_contents(self, full=False, auth_user=None, session=None):
+        if self.content_type != 'sequence':
+            raise ContentTypeMismatchError(self.content_type, 'sequence',
+                                           'read', self.id, self.name)
+
+        contents = sequence_get_contents(id=self.model_instance.content_id,
+                                         session=session)
+        export_level = ExportLevel.STUB
+        contents = [{'interest':
+            rewrap_interest(x["content"].interest).export(
+                export_level=export_level, auth_user=auth_user, session=session),
+            'content_info': x["content"].export(explicit_durations_only=True),
+        }
+            for x in contents]
+
+        return {'interest_id': self.id,
+                'default_duration': self.model_instance.content.default_duration,
+                'estimated_duration': self.estimated_duration(auth_user=auth_user,
+                                                              session=session),
+                'contents': contents}
 
     @with_db
     @require_state((LifecycleStatus.NEW))

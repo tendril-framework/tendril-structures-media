@@ -149,6 +149,20 @@ def sequence_prep_position(id, position, session=None):
     session.flush()
 
 @with_db
+def sequence_get_contents(id, session=None):
+    try:
+        sequence = get_content(id=id, type='sequence', session=session)
+    except NoResultFound:
+        raise ValueError(f"Could not find a 'sequence' content "
+                         f"container with the provided id {id}")
+    return [{
+        'position': c.position,
+        'duration': c.duration,
+        'content': c.content,
+    } for c in sequence.contents]
+
+
+@with_db
 def sequence_add_content(id, content, position=None, duration=None, session=None):
     content_id = content
     if position is None:

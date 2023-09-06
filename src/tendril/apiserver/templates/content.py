@@ -155,6 +155,12 @@ class InterestContentRouterGenerator(ApiRouterGenerator):
             interest: MediaContentInterest = self._actual.item(id=id, session=session)
             return interest.sequence_set_default_duration(default_duration=duration, auth_user=user, session=session)
 
+    async def get_sequence_contents(self, request: Request, id: int,
+                                    full=False, user: AuthUserModel = auth_spec()):
+        with get_session() as session:
+            interest: MediaContentInterest = self._actual.item(id=id, session=session)
+            return interest.sequence_get_contents(full=full, auth_user=user, session=session)
+
     async def add_to_sequence(self, request:Request, id:int, item: SequenceAddTModel,
                               full=True, user: AuthUserModel = auth_spec()):
         with get_session() as session:
@@ -166,7 +172,7 @@ class InterestContentRouterGenerator(ApiRouterGenerator):
 
         with get_session() as session:
             interest: MediaContentInterest = self._actual.item(id=id, session=session)
-            return interest.content_information(full=full, auth_user=user, session=session)
+            return interest.sequence_get_contents(full=full, auth_user=user, session=session)
 
     async def remove_from_sequence(self, request:Request, id:int, position:int,
                                    full=True, user: AuthUserModel = auth_spec()):
@@ -179,7 +185,7 @@ class InterestContentRouterGenerator(ApiRouterGenerator):
 
         with get_session() as session:
             interest: MediaContentInterest = self._actual.item(id=id, session=session)
-            return interest.content_information(full=full, auth_user=user, session=session)
+            return interest.sequence_get_contents(full=full, auth_user=user, session=session)
 
     async def change_item_duration(self, request:Request, id:int,
                                    position:int, duration:int,
@@ -222,6 +228,9 @@ class InterestContentRouterGenerator(ApiRouterGenerator):
                                  dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
 
         if 'sequence' in self._actual.accepted_types.keys():
+            router.add_api_route("/{id}/sequence/contents", self.get_sequence_contents, methods=['GET'],
+                                 dependencies=[auth_spec(scopes=[f'{prefix}:read'])])
+
             router.add_api_route("/{id}/sequence/duration", self.set_sequence_default_duration, methods=['POST'],
                                  response_model=SequenceDefaultDurationResponseTModel,
                                  dependencies=[auth_spec(scopes=[f'{prefix}:write'])])
